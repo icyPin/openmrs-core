@@ -9,6 +9,11 @@
  */
 package org.openmrs.util;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,8 +23,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openmrs.ConceptNumeric;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -39,6 +46,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class OpenmrsUtilUnitTest {
 
 	private List<String> moduleList;
+
+	@TempDir
+	File tempDir;
 
 	@BeforeEach
 	public void setUp() {
@@ -473,6 +483,63 @@ public class OpenmrsUtilUnitTest {
 	public void getRuntimePropertiesFilePathName_shouldReturnNullIfPropertyFileNotExist() {
 
 		assertNull(OpenmrsUtil.getRuntimePropertiesFilePathName("app-openmrs"));
+	}
+
+	@Test
+	public void getFileAsString_shouldReturnFileContents() throws IOException {
+
+		File file = new File(tempDir, "sample.txt");
+		Files.write(file.toPath(), "hello world".getBytes(StandardCharsets.UTF_8));
+
+		assertEquals("hello world", OpenmrsUtil.getFileAsString(file));
+	}
+
+	@Test
+	public void getFileAsString_shouldReadContentsLargerThanTheInternalBuffer() throws IOException {
+
+		String content = "x".repeat(5000);
+		File file = new File(tempDir, "large.txt");
+		Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
+
+		assertEquals(content, OpenmrsUtil.getFileAsString(file));
+	}
+
+	@Test
+	public void getFileAsString_shouldDecodeFileContentsAsUtf8() throws IOException {
+
+		String content = "h\u00e9llo \u2713";
+		File file = new File(tempDir, "utf8.txt");
+		Files.write(file.toPath(), content.getBytes(StandardCharsets.UTF_8));
+
+		assertEquals(content, OpenmrsUtil.getFileAsString(file));
+	}
+
+	@Test
+	public void getFileAsString_shouldReturnEmptyStringForEmptyFile() throws IOException {
+
+		File file = new File(tempDir, "empty.txt");
+		Files.write(file.toPath(), new byte[0]);
+
+		assertEquals("", OpenmrsUtil.getFileAsString(file));
+	}
+
+	@Test
+	public void getFileAsString_shouldThrowExceptionForMissingFile() {
+
+		File file = new File(tempDir, "missing.txt");
+
+		assertThrows(FileNotFoundException.class, () -> OpenmrsUtil.getFileAsString(file));
+	}
+
+	@Test
+	public void getFileAsString_shouldThrowExceptionForUnreadableFile() throws IOException {
+
+		File file = new File(tempDir, "locked.txt");
+		Files.write(file.toPath(), "secret".getBytes(StandardCharsets.UTF_8));
+		file.setReadable(false);
+		Assumptions.assumeFalse(file.canRead(), "cannot make a file unreadable on this system");
+
+		assertThrows(FileNotFoundException.class, () -> OpenmrsUtil.getFileAsString(file));
 	}
 
 }
