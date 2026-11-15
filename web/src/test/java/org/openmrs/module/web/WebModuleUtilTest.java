@@ -154,7 +154,7 @@ public class WebModuleUtilTest {
 	 * @see WebModuleUtil#startModule(Module, ServletContext, boolean)
 	 */
 	@Test
-	public void startModule_dwrModuleXmlshouldContainModuleInfo()
+	public void startModule_dwrModuleXml_shouldContainModuleInfo()
 	        throws ParserConfigurationException, FileNotFoundException {
 		// create dummy module and start it
 		Module mod = buildModuleForMessageTest(buildModuleConfig());
@@ -202,7 +202,8 @@ public class WebModuleUtilTest {
 	}
 
 	@Test
-	public void loadServlets_AddsServletsWithoutInitParams() throws ParserConfigurationException, ClassNotFoundException {
+	public void loadServlets_shouldAddServletsWithoutInitParams()
+	        throws ParserConfigurationException, ClassNotFoundException {
 		String servletClassName1 = "servletClass1";
 		String servletClassName2 = "servletClass2";
 
@@ -243,7 +244,8 @@ public class WebModuleUtilTest {
 	}
 
 	@Test
-	public void loadServlets_AddsCorrectInitParamsToConfig() throws ParserConfigurationException, ClassNotFoundException {
+	public void loadServlets_shouldAddCorrectInitParamsToConfig()
+	        throws ParserConfigurationException, ClassNotFoundException {
 		String servletClassName1 = "servletClass1";
 		String servletClassName2 = "servletClass2";
 
