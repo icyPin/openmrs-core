@@ -10,28 +10,33 @@
 package org.openmrs.web.test;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
-import java.net.URL;
 import java.nio.file.Paths;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openmrs.module.BaseModuleActivatorTest;
 import org.openmrs.module.Module;
+import org.openmrs.module.ModuleConstants;
 import org.openmrs.module.ModuleFactory;
 import org.openmrs.module.ModuleUtil;
 import org.openmrs.module.web.WebModuleUtil;
-import org.openmrs.test.SkipBaseSetup;
 import org.openmrs.util.OpenmrsClassLoader;
+import org.openmrs.util.OpenmrsUtil;
 import org.openmrs.web.Listener;
 import org.springframework.context.support.AbstractRefreshableApplicationContext;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.web.context.support.XmlWebApplicationContext;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openmrs.module.ModuleFactory.getLoadedModules;
 import static org.openmrs.module.ModuleFactory.getStartedModules;
@@ -46,7 +51,7 @@ import static org.openmrs.module.ModuleFactory.getStartedModules;
  */
 @ContextConfiguration(locations = {
         "classpath*:webModuleApplicationContext.xml" }, inheritLocations = true, loader = TestContextLoader.class)
-@SkipBaseSetup
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 
 	public void createWebInfFolderIfNotExist() {
@@ -57,6 +62,19 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 		File folder = Paths.get("target", "test-classes", "WEB-INF").toFile();
 		if (!folder.exists()) {
 			folder.mkdirs();
+		}
+	}
+
+	private File getModuleFile(String resourcePath) throws IOException {
+		try (InputStream stream = OpenmrsClassLoader.getInstance().getResourceAsStream(resourcePath)) {
+			assertNotNull(stream, "Module resource not found: " + resourcePath);
+			String fileName = Paths.get(resourcePath).getFileName().toString();
+			File expandedFile = File.createTempFile(fileName + "-", ".omod");
+			expandedFile.deleteOnExit();
+			try (FileOutputStream outStream = new FileOutputStream(expandedFile, false)) {
+				OpenmrsUtil.copyFile(stream, outStream);
+			}
+			return expandedFile;
 		}
 	}
 
@@ -168,7 +186,7 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 	}
 
 	@Test
-	public void shouldRefreshOtherModulesOnInstallingNewModule() {
+	public void shouldRefreshOtherModulesOnInstallingNewModule() throws IOException {
 		//first completely remove module3
 		Module module = ModuleFactory.getModuleById(MODULE3_ID);
 		ModuleFactory.stopModule(module);
@@ -184,8 +202,7 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 		//  willStart() and started() methods get called for ONLY the newly installed module's activator
 
 		//install a new module3
-		URL url = OpenmrsClassLoader.getInstance().getResource("org/openmrs/module/include/test3-1.0-SNAPSHOT.omod");
-		File file = new File(url.getFile());
+		File file = getModuleFile("org/openmrs/module/include/test3-1.0-SNAPSHOT.omod");
 		module = ModuleFactory.loadModule(file);
 		ModuleFactory.startModule(module);
 		WebModuleUtil.startModule(module, ((XmlWebApplicationContext) applicationContext).getServletContext(), false);
@@ -211,19 +228,19 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 	}
 
 	@Test
-	public void shouldUpgradeModule() {
+	public void shouldUpgradeModule() throws IOException {
 		Module module = ModuleFactory.getModuleById(MODULE3_ID);
 
 		assertTrue(module.getVersion().equals("1.0-SNAPSHOT"));
 
-		URL url = OpenmrsClassLoader.getInstance().getResource("org/openmrs/module/include/test3-2.0-SNAPSHOT.omod");
+		File file = getModuleFile("org/openmrs/module/include/test3-2.0-SNAPSHOT.omod");
 
 		createWebInfFolderIfNotExist();
 
 		ModuleFactory.stopModule(module, false, true); // stop the module with these parameters so that mandatory modules can be upgraded
 		WebModuleUtil.stopModule(module, ((XmlWebApplicationContext) applicationContext).getServletContext());
 		ModuleFactory.unloadModule(module);
-		Module newModule = ModuleFactory.loadModule(new File(url.getFile()));
+		Module newModule = ModuleFactory.loadModule(file);
 		ModuleFactory.startModule(newModule);
 		WebModuleUtil.startModule(newModule, ((XmlWebApplicationContext) applicationContext).getServletContext(), false);
 
@@ -233,11 +250,11 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 	}
 
 	@Test
-	public void shouldUpgradeModuleWithDependents() {
+	public void shouldUpgradeModuleWithDependents() throws IOException {
 		Module module = ModuleFactory.getModuleById(MODULE1_ID);
 		assertTrue(module.getVersion().equals("1.0-SNAPSHOT"));
 
-		URL url = OpenmrsClassLoader.getInstance().getResource("org/openmrs/module/include/test1-2.0-SNAPSHOT.omod");
+		File file = getModuleFile("org/openmrs/module/include/test1-2.0-SNAPSHOT.omod");
 
 		createWebInfFolderIfNotExist();
 
@@ -261,7 +278,7 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 
 		//upgrade module1
 		ModuleFactory.unloadModule(module);
-		Module newModule = ModuleFactory.loadModule(new File(url.getFile()));
+		Module newModule = ModuleFactory.loadModule(file);
 		ModuleFactory.startModule(newModule);
 
 		//web start the upgraded module1
@@ -285,12 +302,6 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 		assertThat(getStartedModules(), hasSize(5));
 	}
 
-	@BeforeEach
-	public void initializeInDatabase() throws Exception {
-		initializeInMemoryDatabase();
-		authenticate();
-	}
-
 	@AfterEach
 	public void removeCurrentTransactionContext() throws Exception {
 		Class<?> clazz = OpenmrsClassLoader.getInstance()
@@ -298,5 +309,13 @@ public class WebModuleActivatorTest extends BaseModuleActivatorTest {
 		Method method = clazz.getDeclaredMethod("removeCurrentTransactionContext");
 		ReflectionUtils.makeAccessible(method);
 		ReflectionUtils.invokeMethod(method, null);
+	}
+
+	@AfterAll
+	public static void cleanUp() {
+		ModuleUtil.shutdown();
+		if (runtimeProperties != null) {
+			runtimeProperties.remove(ModuleConstants.RUNTIMEPROPERTY_MODULE_LIST_TO_LOAD);
+		}
 	}
 }

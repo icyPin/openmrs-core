@@ -91,6 +91,8 @@
 		<property name="transactionAttributeSource" ref="transactionAttributeSource"/>
 	</bean>
 
+	<bean class="org.openmrs.test.jupiter.BaseContextSensitiveNonTransactionalTest$BaseSetupContextClosedListener" />
+
 	<jdbc:initialize-database data-source="dataSource" ignore-failures="DROPS">
 		<jdbc:script location="classpath:create_shedlock_table.sql"/>
 	</jdbc:initialize-database>

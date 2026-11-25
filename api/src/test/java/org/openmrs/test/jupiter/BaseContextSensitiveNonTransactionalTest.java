@@ -1059,4 +1059,12 @@ public abstract class BaseContextSensitiveNonTransactionalTest {
 		skipBaseSetup = true;
 	}
 
+	public static class BaseSetupContextClosedListener implements org.springframework.context.ApplicationListener<org.springframework.context.event.ContextClosedEvent> {
+
+		@Override
+		public void onApplicationEvent(org.springframework.context.event.ContextClosedEvent event) {
+			isBaseSetup = false;
+		}
+	}
+
 }
